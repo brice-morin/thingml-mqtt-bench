@@ -1,0 +1,48 @@
+import "pim/MQTTEchoTestClient.thingml"
+import "TestMQTTReceiverPortJavaMqttJson.thingml"
+import "TestMQTTSenderPortJavaMqttJson.thingml"
+import "mqtt/java/JavaMQTTAdapter.thingml" from stl
+
+thing MQTTEchoTestClientJava includes MQTTEchoTestClient {
+	
+	function timestamp() : UInt32 return `System.currentTimeMillis()` as UInt32
+	
+	function quit()	`System.exit(0);`
+	
+}
+
+configuration EchoJavaTestClient
+@compiler "java"
+{
+	instance echo : MQTTEchoTestClientJava
+	
+	instance timer : TimerJava
+	connector echo.timer => timer.timer
+	
+	instance rx : TestMQTTReceiverPort_JavaMqttJson_Impl
+		set rx.mqtt_topic_name = "ping"
+	connector rx.receiver => echo.sender
+	
+	instance tx : TestMQTTSenderPort_JavaMqttJson_Impl
+		set tx.mqtt_topic_name = "ping"
+	connector echo.receiver => tx.sender
+	
+	
+	instance mqtt : JavaMQTTAdapter
+	
+	connector rx.javamqtt => mqtt.mqtt
+	connector tx.javamqtt => mqtt.mqtt
+	connector echo.mqtt => mqtt.mqtt
+	
+}
+ 
+
+
+
+
+
+
+
+
+ 
+

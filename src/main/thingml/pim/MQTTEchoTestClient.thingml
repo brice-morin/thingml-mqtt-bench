@@ -1,0 +1,228 @@
+import "TestMQTTPorts.thingml"
+import "timer.thingml" from stl
+
+
+thing fragment MQTTEchoTestClient includes TestMQTTSenderPort, TestMQTTReceiverPort, MQTTAdapterCtrlPort, TimerClientPort {
+	
+	readonly property N : UInt8 = 5 //10 iterations with 1000ms period; 100 it with 100ms; 1000 it with 10ms and 10,000 it with 1ms
+	
+	property acks : UInt32[N] = {0, 0, 0, 0, 0}
+	property times : UInt32[N] =  {0, 0, 0, 0, 0}
+	
+	property period : UInt32 = 1000
+	property iterations : UInt32 = 10
+	
+	property N_counter : UInt8 = 0
+	property iteration_counter : UInt16 = 0
+	property timestamp : UInt32
+	
+	readonly property timeout : UInt32 = 100
+	
+	abstract function timestamp() : UInt32
+	abstract function quit()
+	
+	
+	function incAcks(N_counter : UInt8) do
+		if (N_counter < N) acks[N_counter] = acks[N_counter] + 1
+	end
+	
+	function printResults() do
+		println "#Acks:"
+		for(a : UInt32, i:UInt8 in acks) do
+			println "\t>acks[", i, "]:", a
+		end
+		
+		println "#Times:"
+		for(a : UInt32, i:UInt8 in times) do
+			println "\t>time[", i, "]:", a
+		end		
+	end
+	
+	function incIteration() do
+		iteration_counter++
+		if (iteration_counter == iterations) do
+			times[N_counter] = timestamp() - timestamp
+			N_counter++
+			iteration_counter = 0
+			period = period / 10
+			iterations = iterations * 10
+		end	
+	end
+	
+	statechart sc init Connect {
+				
+		state Connect {
+			on entry do
+				println "#Echo: Connecting..."
+				mqtt!mqtt_set_prefix("test/mqttserializer")
+				mqtt!mqtt_connect("TEST", "localhost", 1883, false)
+			end
+			
+			transition -> Connected event mqtt?mqtt_connected
+			transition -> ERROR event mqtt?mqtt_error
+			transition -> ERROR event mqtt?mqtt_disconnected
+		}
+						
+		composite state Connected init TestNoParameters {
+								
+			on entry do
+				println "#Test: Connected and ready."
+			end
+			
+			transition -> ERROR event mqtt?mqtt_error
+			transition -> ERROR event mqtt?mqtt_disconnected
+			
+			state TestNoParameters {
+				
+				on entry do 	
+					if (iteration_counter == 0) timestamp = timestamp()		
+					//println "iteration_counter = ", iteration_counter, ", N_counter = ", N_counter, ", period = ", period, ", iterations = ", iterations						
+					timer!timer_start(0, period)
+				end
+								
+				transition -> TestNumbers1 
+				event receiver?no_parameters 
+				action do
+					timer!timer_cancel(1)
+					incAcks(N_counter)
+				end
+				
+				transition -> TestNumbers1
+				event t : timer?timer_timeout
+				guard t.id == 1
+				
+				 				 
+				internal event t : timer?timer_timeout
+				guard t.id == 0
+				action do
+					sender!no_parameters()
+					timer!timer_start(1, timeout)
+				end
+			}
+			
+			state TestNumbers1 {
+				
+				readonly property i8 : Int8 		= 120
+				readonly property ui8 : UInt8 	= 185
+				readonly property i : Integer 	= 25001
+				readonly property ui : UInt16 	= 43012
+				readonly property d : Double 	= 35.51
+				readonly property l : Int64 		= 1011121314
+				
+				on entry do 					
+					timer!timer_start(0, period)
+				end				
+				
+				transition -> TestNumbers2 
+				event e:receiver?some_numbers 
+				action do
+					timer!timer_cancel(1)
+					readonly var passed : Boolean = (e.i8 == i8) and (e.ui8 == ui8) and (e.i == i) and (e.ui == ui) and (e.d == d) and (e.l == l)
+					if (passed) incAcks(N_counter)
+				end
+				
+				transition -> TestNumbers2
+				event t : timer?timer_timeout
+				guard t.id == 1
+				
+				internal event t : timer?timer_timeout
+				guard t.id == 0
+				action do
+					sender!some_numbers(i8, ui8, i, ui, d, l)
+					timer!timer_start(1, timeout)
+				end
+				
+			}
+			
+			state TestNumbers2 {
+				
+				readonly property i8 : Int8 		= -120
+				readonly property ui8 : UInt8 	= 35
+				readonly property i : Integer 	= -27045
+				readonly property ui : UInt16 	= 0
+				readonly property d : Double 	= -35.75
+				readonly property l : Int64 		= -101112650
+				
+				on entry do 					
+					timer!timer_start(0, period)
+				end								
+				
+				transition -> TestString 
+				event e:receiver?some_numbers 
+				action do
+					timer!timer_cancel(1)
+					readonly var passed : Boolean = (e.i8 == i8) and (e.ui8 == ui8) and (e.i == i) and (e.ui == ui) and (e.d == d) and (e.l == l)
+					if (passed) incAcks(N_counter)
+				end
+				
+				transition -> TestString
+				event t : timer?timer_timeout
+				guard t.id == 1
+				
+				internal event t : timer?timer_timeout
+				guard t.id == 0
+				action do
+					sender!some_numbers(i8, ui8, i, ui, d, l)
+					timer!timer_start(1, timeout)
+				end
+				
+			}
+			
+			state TestString {
+				
+				readonly property c : Char 		= 'c'
+				readonly property str : String 	= "Hello World!"
+				
+				on entry do 	
+					timer!timer_start(0, period)
+				end
+				
+				transition -> STOP
+				guard N_counter == N
+								
+				transition -> TestNoParameters 
+				event e:receiver?some_strings 
+				action do
+					timer!timer_cancel(1)
+					if (e.c == c) incAcks(N_counter)
+					incIteration()
+				end
+				
+				transition -> TestNoParameters
+				event t : timer?timer_timeout
+				guard t.id == 1
+				action incIteration()
+				
+				internal event t : timer?timer_timeout
+				guard t.id == 0
+				action do
+					sender!some_strings(c, str)
+					timer!timer_start(1, timeout)
+				end
+				
+			}
+		
+			final state STOP {
+				on entry do
+					println "#SUCCESS!"
+					mqtt!mqtt_disconnect()
+					printResults()		
+					quit()
+				end
+			}
+			
+		}
+		
+		final state ERROR {
+			on entry do
+				println "#ERROR!"
+				mqtt!mqtt_disconnect()
+				printResults()
+				quit()
+			end	
+		}
+		
+	}
+}
+
+
