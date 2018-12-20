@@ -34,9 +34,7 @@ typedef struct {
 		return `result.size` as UInt32
 	end
 	
-	function log() do
-		`var m runtime.MemStats
-		runtime.ReadMemStats(&m)`		
+	function log() do	
 		println "#usedMem:", usedMemory()
 	end
 }
