@@ -3,12 +3,51 @@ import "TestMQTTReceiverPortPosixMqttJson.thingml"
 import "TestMQTTSenderPortPosixMqttJson.thingml"
 import "mqtt/posix/PosixMQTTAdapter.thingml" from stl
 
+thing MQTTEchoTestClientPosix includes MQTTEchoTestClient
+@c_header "#include <time.h>
+#include <stdlib.h>"
+@c_global "struct timespec t;
+
+typedef struct {
+	unsigned long size,resident,share,text,lib,data,dt;
+} statm_t;"
+{	
+	function quit() `exit(0);`
+	
+	function gc() do `//nothing` end
+	
+	function timestamp() : UInt32 do
+		`clock_gettime(CLOCK_REALTIME, &t);`
+		return `t.tv_sec*1000 + t.tv_nsec/1000000` as UInt32
+	end
+	
+	function usedMemory() : UInt32 do
+		`statm_t result;
+		const char* statm_path = "/proc/self/statm";
+		FILE *f = fopen(statm_path, "r");
+		if (!f) {`
+			return -1	
+		`}
+		if (7 != fscanf(f, "%ld %ld %ld %ld %ld %ld %ld", &result.size, &result.resident, &result.share, &result.text, &result.lib, &result.data, &result.dt)) {`
+			return -1
+		`}`
+		return `result.size` as UInt32
+	end
+	
+	function log() do
+		`var m runtime.MemStats
+		runtime.ReadMemStats(&m)`		
+		println "#usedMem:", usedMemory()
+	end
+}
+
+
 configuration EchoPosixTestClient
 @compiler "posix"
 @add_c_libraries "mosquitto"
 @add_c_modules "jsmn"
 {
-	instance echo : MQTTEchoTestClient
+	instance echo : MQTTEchoTestClientPosix
 	
 	instance timer : TimerPosix
 	connector echo.timer => timer.timer
@@ -18,7 +57,7 @@ configuration EchoPosixTestClient
 	connector rx.receiver => echo.sender
 	
 	instance tx : TestMQTTSenderPort_PosixMqttJson_Impl
-		set tx.mqtt_topic_name = "pong"
+		set tx.mqtt_topic_name = "ping"
 	connector echo.receiver => tx.sender
 	
 	

@@ -9,6 +9,14 @@ thing MQTTEchoTestClientJS includes MQTTEchoTestClient {
 	
 	function quit() `process.exitCode = 1;`
 	
+	function gc() do
+		`if (global.gc) {
+			global.gc();
+		}`		
+	end
+	
+	function log() println "#useMem:", `process.memoryUsage().heapUsed`
+	
 }
 
 configuration EchoJavaTestClient

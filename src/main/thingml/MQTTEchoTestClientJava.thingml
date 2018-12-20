@@ -9,6 +9,10 @@ thing MQTTEchoTestClientJava includes MQTTEchoTestClient {
 	
 	function quit()	`System.exit(0);`
 	
+	function gc() `System.gc();` 
+	
+	function log() println "#usedMem:", `Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()`
+	
 }
 
 configuration EchoJavaTestClient

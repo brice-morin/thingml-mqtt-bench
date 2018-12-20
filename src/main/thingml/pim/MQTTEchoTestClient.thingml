@@ -9,17 +9,19 @@ thing fragment MQTTEchoTestClient includes TestMQTTSenderPort, TestMQTTReceiverP
 	property acks : UInt32[N] = {0, 0, 0, 0, 0}
 	property times : UInt32[N] =  {0, 0, 0, 0, 0}
 	
-	property period : UInt32 = 1000
+	property period : UInt16 = 1000
 	property iterations : UInt32 = 10
 	
 	property N_counter : UInt8 = 0
-	property iteration_counter : UInt16 = 0
+	property iteration_counter : UInt32 = 0
 	property timestamp : UInt32
 	
-	readonly property timeout : UInt32 = 100
+	readonly property timeout : UInt16 = 100
 	
 	abstract function timestamp() : UInt32
 	abstract function quit()
+	abstract function gc()
+	abstract function log()
 	
 	
 	function incAcks(N_counter : UInt8) do
@@ -41,11 +43,13 @@ thing fragment MQTTEchoTestClient includes TestMQTTSenderPort, TestMQTTReceiverP
 	function incIteration() do
 		iteration_counter++
 		if (iteration_counter == iterations) do
+			gc()
 			times[N_counter] = timestamp() - timestamp
 			N_counter++
 			iteration_counter = 0
 			period = period / 10
 			iterations = iterations * 10
+			log()
 		end	
 	end
 	
@@ -206,7 +210,9 @@ thing fragment MQTTEchoTestClient includes TestMQTTSenderPort, TestMQTTReceiverP
 				on entry do
 					println "#SUCCESS!"
 					mqtt!mqtt_disconnect()
-					printResults()		
+					gc()
+					printResults()					
+					log()		
 					quit()
 				end
 			}
@@ -217,7 +223,9 @@ thing fragment MQTTEchoTestClient includes TestMQTTSenderPort, TestMQTTReceiverP
 			on entry do
 				println "#ERROR!"
 				mqtt!mqtt_disconnect()
-				printResults()
+				gc()
+				printResults()				
+				log()
 				quit()
 			end	
 		}

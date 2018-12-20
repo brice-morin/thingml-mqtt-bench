@@ -1,4 +1,5 @@
-import "MQTTAdapterMsgs.thingml"
+import "mqtt/MQTTAdapterMsgs.thingml" from stl
+import "datatypes.thingml" from stl
 
 
 thing fragment TestMQTTMsgs {

@@ -1,0 +1,58 @@
+import "pim/MQTTEchoTestClient.thingml"
+import "TestMQTTReceiverPortGoMqttJson.thingml"
+import "TestMQTTSenderPortGoMqttJson.thingml"
+import "mqtt/go/GoMQTTAdapter.thingml" from stl
+
+thing MQTTEchoTestClientGo includes MQTTEchoTestClient
+@go_import "time" 
+@go_import "os"
+@go_import "runtime"
+{
+	function gc() `runtime.GC();`
+	
+	function quit() `os.Exit(0);`
+	
+	function timestamp() : UInt32 return `uint32(time.Now().UnixNano() / int64(time.Millisecond))` as UInt32
+	
+	function log() do
+		`var m runtime.MemStats
+		runtime.ReadMemStats(&m)`		
+		println "#usedMem:", `m.HeapAlloc`
+	end
+}
+
+configuration EchoGoTestClient
+@compiler "go"
+{
+	instance echo : MQTTEchoTestClientGo
+	
+	instance timer : TimerGo
+	connector echo.timer => timer.timer
+	
+	instance rx : TestMQTTReceiverPort_GoMqttJson_Impl
+		set rx.mqtt_topic_name = "ping"
+	connector rx.receiver => echo.sender
+	
+	instance tx : TestMQTTSenderPort_GoMqttJson_Impl
+		set tx.mqtt_topic_name = "ping"
+	connector echo.receiver => tx.sender
+	
+	
+	instance mqtt : GoMQTTAdapter
+	
+	connector rx.gomqtt => mqtt.mqtt
+	connector tx.gomqtt => mqtt.mqtt
+	connector echo.mqtt => mqtt.mqtt
+	
+}
+ 
+
+
+
+
+
+
+
+
+ 
+
